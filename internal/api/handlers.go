@@ -2,24 +2,52 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log/slog"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/yourusername/dmn-engine-go/internal/dmn"
-	"github.com/yourusername/dmn-engine-go/internal/storage"
+	"github.com/konstantin/dmn-engine-go/internal/dmn"
+	"github.com/konstantin/dmn-engine-go/internal/storage"
 )
 
 // Handler contains all HTTP handlers
 type Handler struct {
 	repo   storage.DefinitionRepository
+	engine EngineInterface
 	logger *slog.Logger
 }
 
+// EngineInterface is the interface for the evaluation engine
+type EngineInterface interface {
+	Evaluate(ctx context.Context, req *EvaluateRequest) (*EvaluateResult, error)
+}
+
+// EvaluateRequest mirrors engine.EvaluateRequest for API
+type EvaluateRequest struct {
+	DecisionKey string                 `json:"decisionKey"`
+	Version     *int                   `json:"version,omitempty"`
+	Variables   map[string]interface{} `json:"variables"`
+	TenantID    string                 `json:"tenantId,omitempty"`
+}
+
+// EvaluateResult mirrors engine.EvaluateResult for API
+type EvaluateResult struct {
+	DecisionKey  string                   `json:"decisionKey"`
+	DecisionName string                   `json:"decisionName"`
+	Version      int                      `json:"version"`
+	Outputs      []map[string]interface{} `json:"outputs"`
+	MatchedRules []string                 `json:"matchedRules"`
+	EvaluatedAt  time.Time                `json:"evaluatedAt"`
+	DurationNs   int64                    `json:"durationNs"`
+}
+
 // NewHandler creates a new handler
-func NewHandler(repo storage.DefinitionRepository, logger *slog.Logger) *Handler {
+func NewHandler(repo storage.DefinitionRepository, engine EngineInterface, logger *slog.Logger) *Handler {
 	return &Handler{
 		repo:   repo,
+		engine: engine,
 		logger: logger,
 	}
 }
@@ -322,11 +350,55 @@ func (h *Handler) Info(c *fiber.Ctx) error {
 		"version": "0.1.0-pre-mvp",
 		"features": fiber.Map{
 			"dmn_version":   "1.3",
-			"feel_support":  false,
+			"feel_support":  "basic",
 			"storage":       "postgresql",
 			"multi_tenancy": true,
 			"hit_policies":  []string{"UNIQUE", "FIRST", "ANY", "PRIORITY", "COLLECT", "RULE ORDER", "OUTPUT ORDER"},
-			"evaluation":    false, // Пока без выполнения
+			"evaluation":    true, // Базовое выполнение реализовано
 		},
 	})
+}
+
+// Evaluate handles POST /api/v1/evaluate
+func (h *Handler) Evaluate(c *fiber.Ctx) error {
+	var req EvaluateRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(ErrorResponse{Error: "invalid request body: " + err.Error()})
+	}
+
+	// Validate request
+	if req.DecisionKey == "" {
+		return c.Status(400).JSON(ErrorResponse{Error: "decisionKey is required"})
+	}
+	if req.Variables == nil {
+		req.Variables = make(map[string]interface{})
+	}
+
+	// Get tenant ID from header if not in body
+	if req.TenantID == "" {
+		req.TenantID = c.Get("X-Tenant-ID")
+	}
+
+	// Evaluate
+	if h.engine == nil {
+		return c.Status(503).JSON(ErrorResponse{Error: "evaluation engine not available"})
+	}
+
+	result, err := h.engine.Evaluate(c.Context(), &req)
+	if err != nil {
+		h.logger.Error("evaluation failed",
+			"decisionKey", req.DecisionKey,
+			"error", err,
+		)
+		return c.Status(500).JSON(ErrorResponse{Error: "evaluation failed: " + err.Error()})
+	}
+
+	h.logger.Info("decision evaluated",
+		"decisionKey", result.DecisionKey,
+		"version", result.Version,
+		"matchedRules", len(result.MatchedRules),
+		"durationMs", result.DurationNs/1000000,
+	)
+
+	return c.JSON(result)
 }

@@ -1,41 +1,63 @@
 # Binaries
 bin/
 *.exe
-*.exe~
 *.dll
 *.so
 *.dylib
+dmn-engine
 
 # Test binary
 *.test
 
-# Output of go coverage
+# Output coverage files
 *.out
 coverage.html
 
-# Dependency directories
-vendor/
+# Go workspace file
+go.work
+
+# Environment files
+.env
+*.env.local
+dev.env
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
 
-# Environment files (contain secrets)
-.env
-*.env.local
-
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
+# Database
+*.db
+*.sqlite
+
 # Logs
 *.log
-logs/
+server.log
 
-# Temp files
+# Temporary files
 tmp/
 temp/
+comparison_results.txt
 
+# Generated test data
+testdata/dmn/stress/
+*.dmn.backup
+
+# Benchmark results (large JSON files)
+benchmarks/results/*.json
+benchmarks/results/*.txt
+!benchmarks/results/.gitkeep
+
+# Docker volumes
+postgres_data/
+redis_data/
+
+# Build artifacts
+*.tar
+*.tar.gz

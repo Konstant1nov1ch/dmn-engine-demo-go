@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  camunda:
+    build: .
+    # Или можно использовать напрямую официальный образ:
+    # image: camunda/camunda-bpm-platform:7.24.0
+    container_name: camunda-7.24
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_DRIVER=org.postgresql.Driver
+      - DB_URL=jdbc:postgresql://postgres:5432/camunda
+      - DB_USERNAME=camunda
+      - DB_PASSWORD=camunda
+      # Настройки администратора
+      - CAMUNDA_BPM_ADMIN_USER_ID=admin
+      - CAMUNDA_BPM_ADMIN_USER_PASSWORD=admin
+      - CAMUNDA_BPM_ADMIN_USER_FIRSTNAME=Admin
+      - CAMUNDA_BPM_ADMIN_USER_LASTNAME=User
+    volumes:
+      # Монтирование BPMN/DMN файлов для автодеплоя
+      - ./deployments:/camunda/configuration/resources
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - camunda-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: camunda-postgres
+    environment:
+      - POSTGRES_DB=camunda
+      - POSTGRES_USER=camunda
+      - POSTGRES_PASSWORD=camunda
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camunda -d camunda"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - camunda-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  camunda-network:
+    driver: bridge
+

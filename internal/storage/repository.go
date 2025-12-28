@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yourusername/dmn-engine-go/internal/dmn"
+	"github.com/konstantin/dmn-engine-go/internal/dmn"
 )
 
 // Definition represents a stored DMN definition

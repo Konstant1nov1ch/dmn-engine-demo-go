@@ -1,118 +1,88 @@
-.PHONY: build test run lint docker-build docker-run clean help db-up db-down
+# DMN Engine Go - Makefile
 
-# Go parameters
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
-BINARY_NAME=dmn-engine
-BINARY_PATH=bin/$(BINARY_NAME)
+.PHONY: help build run run-debug test db-up db-down clean docker-build camunda-up camunda-down benchmark
 
-# Environment file
-ENV_FILE?=dev.env
+help: ## Show this help
+	@echo "DMN Engine Go - Available commands:"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-# Load env file if exists
-ifneq (,$(wildcard $(ENV_FILE)))
-    include $(ENV_FILE)
-    export
-endif
+build: ## Build the binary
+	@echo "Building DMN Engine Go..."
+	@mkdir -p bin
+	@go build -o bin/dmn-engine ./cmd/server
+	@echo "✅ Build complete: bin/dmn-engine"
 
-# Database (fallback if not in env file)
-DATABASE_URL?=postgres://dmn:dmn@localhost:5432/dmn?sslmode=disable
+run: build ## Build and run the server
+	@echo "Starting DMN Engine Go..."
+	@export $$(cat dev.env | xargs) && ./bin/dmn-engine
 
-# Default target
-all: build
+run-debug: build ## Run with debug logging
+	@echo "Starting DMN Engine Go (DEBUG)..."
+	@export LOG_LEVEL=debug && export $$(cat dev.env | xargs) && ./bin/dmn-engine
 
-## help: Show this help message
-help:
-	@echo "Usage: make [target]"
+test: ## Run tests
+	@echo "Running tests..."
+	@go test -v ./...
+
+db-up: ## Start PostgreSQL
+	@echo "Starting PostgreSQL..."
+	@docker-compose up -d postgres
+	@echo "✅ PostgreSQL started on port 5432"
+
+db-down: ## Stop PostgreSQL
+	@echo "Stopping PostgreSQL..."
+	@docker-compose down
+	@echo "✅ PostgreSQL stopped"
+
+clean: ## Clean build artifacts
+	@echo "Cleaning..."
+	@rm -rf bin/
+	@echo "✅ Cleaned"
+
+docker-build: ## Build Docker image
+	@echo "Building Docker image..."
+	@docker build -f deployments/docker/Dockerfile -t dmn-engine-go:latest .
+	@echo "✅ Docker image built"
+
+# Camunda benchmarking
+camunda-up: ## Start Camunda 7 for benchmarking
+	@echo "Starting Camunda 7..."
+	@cd deployments/camunda && docker-compose up -d
+	@echo "⏳ Waiting for Camunda to start (this takes ~30-60 seconds)..."
+	@sleep 10
+	@echo "Check status: docker-compose -f deployments/camunda/docker-compose.yml logs -f camunda"
+	@echo "Camunda UI: http://localhost:8081/camunda/ (admin/admin)"
+
+camunda-down: ## Stop Camunda 7
+	@echo "Stopping Camunda 7..."
+	@cd deployments/camunda && docker-compose down
+	@echo "✅ Camunda stopped"
+
+camunda-logs: ## Show Camunda logs
+	@cd deployments/camunda && docker-compose logs -f camunda
+
+# Benchmarking
+benchmark: ## Run professional k6 load test (usage: make benchmark DECISIONS=50)
+	@echo "🚀 Running professional k6 benchmark with $(or $(DECISIONS),50) decisions..."
+	@./benchmarks/run_benchmark.sh $(or $(DECISIONS),50)
+
+benchmark-quick: ## Quick benchmark with fewer decisions (10 decisions)
+	@echo "⚡ Running quick benchmark with 10 decisions..."
+	@./benchmarks/run_benchmark.sh 10
+
+# Setup everything
+setup-all: db-up ## Setup database
+	@echo "✅ Database ready!"
 	@echo ""
-	@echo "Targets:"
-	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
+	@echo "Run benchmarks: make benchmark DECISIONS=50"
 
-## build: Build the application
-build:
-	$(GOBUILD) -o $(BINARY_PATH) ./cmd/server
-
-## run: Run the application (requires PostgreSQL)
-run:
-	$(GOCMD) run ./cmd/server
-
-## run-debug: Run with debug logging
-run-debug:
-	LOG_LEVEL=debug $(GOCMD) run ./cmd/server
-
-## test: Run all tests
-test:
-	$(GOTEST) -v -race ./...
-
-## test-short: Run short tests only
-test-short:
-	$(GOTEST) -v -short ./...
-
-## test-coverage: Run tests with coverage
-test-coverage:
-	$(GOTEST) -v -coverprofile=coverage.out ./...
-	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report: coverage.html"
-
-## lint: Run linter
-lint:
-	golangci-lint run
-
-## fmt: Format code
-fmt:
-	$(GOCMD) fmt ./...
-
-## mod-tidy: Tidy go modules
-mod-tidy:
-	$(GOMOD) tidy
-
-## mod-download: Download go modules
-mod-download:
-	$(GOMOD) download
-
-## db-up: Start PostgreSQL with docker-compose
-db-up:
-	docker-compose up -d postgres
-	@echo "Waiting for PostgreSQL to be ready..."
-	@sleep 3
-	@echo "PostgreSQL is ready at localhost:5432"
-
-## db-down: Stop PostgreSQL
-db-down:
-	docker-compose down
-
-## db-logs: Show PostgreSQL logs
-db-logs:
-	docker-compose logs -f postgres
-
-## db-psql: Connect to PostgreSQL with psql
-db-psql:
-	docker-compose exec postgres psql -U dmn -d dmn
-
-## docker-build: Build docker image
-docker-build:
-	docker build -t dmn-engine:latest -f deployments/docker/Dockerfile .
-
-## clean: Clean build artifacts
-clean:
-	rm -rf bin/
-	rm -f coverage.out coverage.html
-
-## install-tools: Install development tools
-install-tools:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-## demo: Deploy a sample DMN and test
-demo:
-	@echo "Deploying sample DMN..."
-	curl -X POST http://localhost:8080/api/v1/definitions \
+demo: ## Quick demo deployment
+	@echo "Demo: Deploying sample DMN..."
+	@curl -X POST http://localhost:8080/api/v1/definitions \
 		-H "Content-Type: application/xml" \
 		--data-binary @testdata/dmn/simple_decision.dmn
 	@echo ""
-	@echo ""
-	@echo "Listing definitions..."
-	curl http://localhost:8080/api/v1/definitions
-	@echo ""
+	@echo "Demo: Evaluating decision..."
+	@curl -X POST http://localhost:8080/api/v1/evaluate \
+		-H "Content-Type: application/json" \
+		-d '{"decisionKey":"eligibility","variables":{"age":25}}' | jq .

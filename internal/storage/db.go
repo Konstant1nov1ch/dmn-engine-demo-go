@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/yourusername/dmn-engine-go/internal/config"
+	"github.com/konstantin/dmn-engine-go/internal/config"
 )
 
 // NewPool создаёт пул соединений с PostgreSQL из конфигурации

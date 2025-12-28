@@ -1,7 +1,43 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database
+  dmn-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dmn-engine
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=dmn
+      - DB_PASSWORD=dmn
+      - DB_NAME=dmn
+      - REDIS_ADDR=redis:6379
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - dmn-network
+
   postgres:
     image: postgres:16-alpine
     container_name: dmn-postgres
@@ -13,30 +49,39 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./deployments/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dmn -d dmn"]
+      test: ["CMD-SHELL", "pg_isready -U dmn"]
       interval: 5s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
+    networks:
+      - dmn-network
 
-  # DMN Engine (optional - for full stack testing)
-  # dmn-engine:
-  #   build:
-  #     context: .
-  #     dockerfile: deployments/docker/Dockerfile
-  #   container_name: dmn-engine
-  #   ports:
-  #     - "8080:8080"
-  #   environment:
-  #     - PORT=8080
-  #     - DATABASE_URL=postgres://dmn:dmn@postgres:5432/dmn?sslmode=disable
-  #     - LOG_LEVEL=debug
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    container_name: dmn-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - dmn-network
 
 volumes:
   postgres_data:
 
+networks:
+  dmn-network:
+    driver: bridge

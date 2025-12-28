@@ -11,9 +11,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/yourusername/dmn-engine-go/internal/api"
-	"github.com/yourusername/dmn-engine-go/internal/config"
-	"github.com/yourusername/dmn-engine-go/internal/storage"
+	"github.com/konstantin/dmn-engine-go/internal/api"
+	"github.com/konstantin/dmn-engine-go/internal/config"
+	"github.com/konstantin/dmn-engine-go/internal/engine"
+	"github.com/konstantin/dmn-engine-go/internal/storage"
 )
 
 func main() {
@@ -63,6 +64,9 @@ func main() {
 	// Repository
 	repo := storage.NewPostgresRepository(pool)
 
+	// Engine
+	engine := &EngineAdapter{repo: repo}
+
 	// HTTP Server
 	app := fiber.New(fiber.Config{
 		AppName:               "DMN Engine Go",
@@ -82,7 +86,7 @@ func main() {
 	app.Use(api.LoggerMiddleware(logger))
 
 	// Routes
-	handler := api.NewHandler(repo, logger)
+	handler := api.NewHandler(repo, engine, logger)
 	api.SetupRoutes(app, handler)
 
 	// Graceful shutdown
@@ -110,4 +114,38 @@ func main() {
 	}
 
 	logger.Info("server stopped")
+}
+
+// EngineAdapter adapts engine.Engine to api.EngineInterface
+type EngineAdapter struct {
+	repo storage.DefinitionRepository
+}
+
+func (a *EngineAdapter) Evaluate(ctx context.Context, req *api.EvaluateRequest) (*api.EvaluateResult, error) {
+	eng := engine.NewEngine(a.repo)
+	
+	// Convert API request to engine request
+	engineReq := &engine.EvaluateRequest{
+		DecisionKey: req.DecisionKey,
+		Version:     req.Version,
+		Variables:   req.Variables,
+		TenantID:    req.TenantID,
+	}
+	
+	// Evaluate
+	result, err := eng.Evaluate(ctx, engineReq)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert engine result to API result
+	return &api.EvaluateResult{
+		DecisionKey:  result.DecisionKey,
+		DecisionName: result.DecisionName,
+		Version:      result.Version,
+		Outputs:      result.Outputs,
+		MatchedRules: result.MatchedRules,
+		EvaluatedAt:  result.EvaluatedAt,
+		DurationNs:   result.DurationNs,
+	}, nil
 }

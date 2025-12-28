@@ -1,4 +1,4 @@
-module github.com/yourusername/dmn-engine-go
+module github.com/konstantin/dmn-engine-go
 
 go 1.22
 

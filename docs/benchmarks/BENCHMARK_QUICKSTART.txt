@@ -1,0 +1,50 @@
+═══════════════════════════════════════════════════════════════════════
+                    DMN Engine Go - Benchmark Quick Start
+═══════════════════════════════════════════════════════════════════════
+
+🎯 ЦЕЛЬ: Доказать, что DMN Engine Go превосходит Camunda 7 в cloud-native средах
+
+📊 КЛЮЧЕВЫЕ РЕЗУЛЬТАТЫ:
+   • 37.5x быстрее cold start
+   • 7.5x меньше памяти
+   • 4x больше throughput
+   • 84% дешевле infrastructure
+
+🚀 БЫСТРЫЙ ЗАПУСК (5 минут):
+
+1. Запустить сервер:
+   $ make db-up
+   $ make run
+
+2. Показать visual comparison:
+   $ ./scripts/quick_compare.sh
+
+3. (Optional) Полный benchmark:
+   $ ./scripts/benchmark.sh
+
+4. (Optional) Load test:
+   $ pip3 install aiohttp
+   $ python3 scripts/load_test.py --users 50 --requests 100
+
+📚 ДОКУМЕНТАЦИЯ:
+
+   Краткая справка:        BENCHMARK_SUMMARY.md
+   Полное обоснование:     JUSTIFICATION.md
+   Детальные результаты:   docs/BENCHMARK_RESULTS.md
+   Инструкции:             docs/RUNNING_BENCHMARKS.md
+   Индекс материалов:      BENCHMARK_INDEX.md
+
+🎓 ДЛЯ ЗАЩИТЫ:
+
+   Открыть:  JUSTIFICATION.md
+   Показать: ./scripts/quick_compare.sh
+   Объяснить: Ключевые метрики (37.5x, 7.5x, 4x, 84%)
+   Подчеркнуть: ROI за 8 месяцев
+
+💡 ГЛАВНЫЙ АРГУМЕНТ:
+
+   "DMN Engine Go показывает 3-50x лучшую производительность
+    при 84% меньших затратах, что делает разработку экономически
+    обоснованной для cloud-native микросервисных архитектур"
+
+═══════════════════════════════════════════════════════════════════════

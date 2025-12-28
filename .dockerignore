@@ -1,0 +1,38 @@
+# Ignore files for Docker build
+.git
+.github
+*.md
+!README.md
+.gitignore
+.env
+dev.env
+
+# Build artifacts
+bin/
+*.exe
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test data
+testdata/dmn/stress/
+
+# Benchmarks
+benchmarks/results/
+
+# Documentation
+docs/
+
+# Deployment configs
+deployments/
+docker-compose*.yml
+
+# Logs
+*.log
+/tmp/
+

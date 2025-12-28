@@ -25,4 +25,7 @@ func SetupRoutes(app *fiber.App, h *Handler) {
 	definitions.Get("/:key/parsed", h.GetDefinitionParsed)     // Get parsed model
 	definitions.Get("/:key/versions", h.GetDefinitionVersions) // Get all versions
 	definitions.Delete("/:key", h.DeleteDefinition)            // Delete definition
+
+	// Evaluation
+	v1.Post("/evaluate", h.Evaluate) // Evaluate a decision
 }
